@@ -1,0 +1,80 @@
+version: '3'
+
+services:
+
+  db:
+    image: postgres:11
+
+    environment:
+      POSTGRES_DB: commento
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - 5432:5432
+    networks:
+      - net
+    volumes:
+      - postgres_data_volume:/var/lib/postgres/data
+
+
+
+  app_server:
+    image: registry.gitlab.com/commento/commento:v1.4.0
+    ports:
+      - 8080:8080
+
+    environment:
+      COMMENTO_ORIGIN: http://127.0.0.1:8080/
+      COMMENTO_PORT: 8080
+      COMMENTO_POSTGRES: postgres://postgres:postgres@db:5432/commento?sslmode=disable
+    depends_on:
+      - db
+    networks:
+      - net
+
+
+  certbot:
+    build:
+      context: certbot
+    environment:
+      # Update the settings below appropriately
+      DOMAIN: http://127.0.0.1
+      EMAIL: YOUR@EMAIL_ADDRESS
+    volumes:
+      - certbot_etc_volume:/etc/letsencrypt
+      - certbot_var_volume:/var/www/certbot
+    networks:
+      - net
+
+
+  nginx:
+    build:
+      context: nginx
+      args:
+        # Update the settings below appropriately
+        DOMAIN: http://127.0.0.1
+
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - certbot
+      - app
+    networks:
+      - net
+    volumes:
+      - certbot_etc_volume:/etc/letsencrypt:ro
+      - certbot_var_volume:/var/www/certbot
+
+
+
+networks:
+  net:
+
+volumes:
+  postgres_data_volume:
+    external: true
+  certbot_etc_volume:
+    external: true
+  certbot_var_volume:
+    external: true
